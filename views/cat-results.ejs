@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Race Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <%- include('partials/_header') %>
+
+    <div class="container pt-5 my-5">
+        <h1 class="text-center mb-5">Race Results</h1>
+        <% categoryStats.forEach(category => { %>
+            <div class="mt-5">
+                <h2 class="text-center"><%= category.name %></h2>
+                <p class="text-center">
+                    <%= category.totalRegistered %> Registered | 
+                    <%= category.totalFinished %> Finished | 
+                    <%= category.didNotStart %> Did Not Start | 
+                    <%= category.didNotFinish %> Did Not Finish | 
+                    <%= category.disqualified %> Disqualified
+                </p>
+                <div class="row">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Participant Name</th>
+                                <th>Start Time</th>
+                                <th>Finish Time</th>
+                                <th>Time Taken (HH:MM:SS)</th>
+                                <th>Leader (MM:SS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% category.results.forEach((result, index) => { %>
+                                <tr>
+                                    <td><%= index + 1 %></td>
+                                    <td><%= result.name %></td>
+                                    <td><%= result.start %></td>
+                                    <td><%= result.finish %></td>
+                                    <td><%= result.formattedTime %></td>
+                                    <td><%= index === 0 ? 'Leader' : result.formattedTime %></td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        <% }); %>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

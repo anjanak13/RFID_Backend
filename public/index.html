@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Race Results</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+    </style>
+</head>
+<body>
+    <h1>Race Results</h1>
+    <table id="resultsTable">
+        <thead>
+            <tr>
+                <th>Tag ID</th>
+                <th>Reader 1 IP</th>
+                <th>Reader 1 Timestamp</th>
+                <th>Reader 2 IP</th>
+                <th>Reader 2 Timestamp</th>
+                <th>Time Difference (HH:MM:SS)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Data will be dynamically inserted here -->
+        </tbody>
+    </table>
+
+    <script>
+       
+        async function fetchRaceResults() {
+            try {
+                const response = await fetch('http://localhost:3000/race-results');
+                const raceResults = await response.json();
+
+                const tableBody = document.getElementById('resultsTable').querySelector('tbody');
+                tableBody.innerHTML = '';
+
+                raceResults.forEach(result => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${result.tagId}</td>
+                        <td>${result.reader1.ip}</td>
+                        <td>${new Date(result.reader1.timestamp).toLocaleString()}</td>
+                        <td>${result.reader2.ip}</td>
+                        <td>${new Date(result.reader2.timestamp).toLocaleString()}</td>
+                        <td>${result.timeDifference.hours}h ${result.timeDifference.minutes}m ${result.timeDifference.seconds}s</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error fetching race results:', error);
+            }
+        }
+
+        // Fetch race results on page load
+        fetchRaceResults();
+    </script>
+</body>
+</html>

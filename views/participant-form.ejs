@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Participant Registration</title>
+    <!-- Bootstrap 5 CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+
+    <%- include('partials/_header') %>
+    
+    <div class="container pt-5 my-5">
+        <h1 class="text-center mb-4">Participant Registration Form</h1>
+        <form id="participantForm" class="p-4 border rounded shadow">
+            <div class="mb-3">
+                <label for="raceName" class="form-label">Race Name:</label>
+                <input type="text" id="raceName" name="raceName" class="form-control" placeholder="Enter Race Name" required>
+            </div>
+            <div class="mb-3">
+                <label for="firstName" class="form-label">First Name:</label>
+                <input type="text" id="firstName" name="firstName" class="form-control" placeholder="Enter First Name" required>
+            </div>
+            <div class="mb-3">
+                <label for="lastName" class="form-label">Last Name:</label>
+                <input type="text" id="lastName" name="lastName" class="form-control" placeholder="Enter Last Name" required>
+            </div>
+            <div class="mb-3">
+                <label for="age" class="form-label">Age:</label>
+                <input type="number" id="age" name="age" class="form-control" placeholder="Enter Age" min="1" required>
+            </div>
+            <div class="mb-3">
+                <label for="gender" class="form-label">Gender:</label>
+                <select id="gender" name="gender" class="form-select" required>
+                    <option value="" selected>Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label for="tagNumber" class="form-label">Tag Number:</label>
+                <input type="text" id="tagNumber" name="tagNumber" class="form-control" placeholder="Enter Tag Number" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Submit</button>
+        </form>
+    </div>
+
+    <!-- Success Modal -->
+    <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="successModalLabel">Success</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Participant added successfully!
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom Script -->
+    <script>
+        document.getElementById('participantForm').addEventListener('submit', async (event) => {
+            event.preventDefault(); // Prevent default form submission
+            
+            const formData = new FormData(event.target);
+            const data = Object.fromEntries(formData.entries()); // Convert to JSON-like object
+            
+            try {
+                const response = await fetch('/submit-participant', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+
+                if (response.ok) {
+                    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                    successModal.show(); // Show the success modal
+                    event.target.reset(); // Reset the form for the next entry
+                } else {
+                    alert('Failed to add participant. Please check your inputs and try again.');
+                }
+            } catch (error) {
+                console.error('Error during form submission:', error);
+                alert('An error occurred while submitting the form. Please try again later.');
+            }
+        });
+    </script>
+</body>
+</html>
