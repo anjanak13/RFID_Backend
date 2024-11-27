@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin - Approve Users</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+</head>
+<body>
+    <%- include('partials/_header') %>
+
+    <div class="container pt-5 my-5">
+        <h1>Approve Users</h1>
+
+        <!-- Pending Users -->
+        <h2 class="mt-5">Pending Users</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">Full Name</th>
+                    <th scope="col">Username</th>
+                    <th scope="col">Race</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% pendingUsers.forEach(user => { %>
+                    <tr>
+                        <td><%= user.firstName %> <%= user.lastName %></td>
+                        <td><%= user.username %></td>
+                        <td><%= user.race %></td>
+                        <td><%= user.status %></td>
+                        <td>
+                            <form action="/admin/approve/<%= user.username %>" method="POST">
+                                <button type="submit" class="btn btn-success">Approve</button>
+                            </form>
+                        </td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+
+        <!-- Approved Users -->
+        <h2 class="mt-5">Approved Users</h2>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th scope="col">Full Name</th>
+                    <th scope="col">Username</th>
+                    <th scope="col">Race</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Role</th>
+                    <th scope="col">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% approvedUsers.forEach(user => { %>
+                    <tr>
+                        <td><%= user.firstName %> <%= user.lastName %></td>
+                        <td><%= user.username %></td>
+                        <td><%= user.race %></td>
+                        <td><%= user.status %></td>
+                        <td><%= user.role %></td>
+                        <td>
+                            <form action="/admin/revoke/<%= user.username %>" method="POST">
+                                <button type="submit" class="btn btn-danger">Revoke</button>
+                            </form>
+                        </td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+</body>
+</html>

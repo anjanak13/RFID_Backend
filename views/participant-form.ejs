@@ -3,47 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Participant Registration</title>
-    <!-- Bootstrap 5 CDN -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Submit Participant</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
 </head>
 <body>
-
     <%- include('partials/_header') %>
-    
+
     <div class="container pt-5 my-5">
-        <h1 class="text-center mb-4">Participant Registration Form</h1>
-        <form id="participantForm" class="p-4 border rounded shadow">
+        <h1>Submit Participant for Race: <%= race %></h1>
+
+        <!-- Hidden input for raceName -->
+        <form id="participantForm" action="/submit-participant/<%= username %>" method="POST">
+            <!-- Hidden input to send raceName -->
+            <input type="hidden" name="raceName" value="<%= race %>">
+            
             <div class="mb-3">
-                <label for="raceName" class="form-label">Race Name:</label>
-                <input type="text" id="raceName" name="raceName" class="form-control" placeholder="Enter Race Name" required>
+                <label for="firstName" class="form-label">First Name</label>
+                <input type="text" name="firstName" id="firstName" class="form-control" required>
             </div>
+
             <div class="mb-3">
-                <label for="firstName" class="form-label">First Name:</label>
-                <input type="text" id="firstName" name="firstName" class="form-control" placeholder="Enter First Name" required>
+                <label for="lastName" class="form-label">Last Name</label>
+                <input type="text" name="lastName" id="lastName" class="form-control" required>
             </div>
+
             <div class="mb-3">
-                <label for="lastName" class="form-label">Last Name:</label>
-                <input type="text" id="lastName" name="lastName" class="form-control" placeholder="Enter Last Name" required>
+                <label for="age" class="form-label">Age</label>
+                <input type="number" name="age" id="age" class="form-control" required>
             </div>
+
             <div class="mb-3">
-                <label for="age" class="form-label">Age:</label>
-                <input type="number" id="age" name="age" class="form-control" placeholder="Enter Age" min="1" required>
-            </div>
-            <div class="mb-3">
-                <label for="gender" class="form-label">Gender:</label>
-                <select id="gender" name="gender" class="form-select" required>
-                    <option value="" selected>Select Gender</option>
+                <label for="gender" class="form-label">Gender</label>
+                <select name="gender" id="gender" class="form-select" required>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
-                    <option value="Other">Other</option>
                 </select>
             </div>
+
             <div class="mb-3">
-                <label for="tagNumber" class="form-label">Tag Number:</label>
-                <input type="text" id="tagNumber" name="tagNumber" class="form-control" placeholder="Enter Tag Number" required>
+                <label for="tagNumber" class="form-label">Tag Number</label>
+                <input type="text" name="tagNumber" id="tagNumber" class="form-control" required>
             </div>
-            <button type="submit" class="btn btn-primary w-100">Submit</button>
+
+            <button type="submit" class="btn btn-primary">Submit Participant</button>
         </form>
     </div>
 
@@ -84,9 +86,12 @@
                 });
 
                 if (response.ok) {
+                    // Show the success modal if the participant was added successfully
                     const successModal = new bootstrap.Modal(document.getElementById('successModal'));
                     successModal.show(); // Show the success modal
-                    event.target.reset(); // Reset the form for the next entry
+                    
+                    // Reset the form for the next entry
+                    event.target.reset(); 
                 } else {
                     alert('Failed to add participant. Please check your inputs and try again.');
                 }
