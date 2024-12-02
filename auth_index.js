@@ -29,50 +29,6 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(flash()); 
 
-function isAdmin(req, res, next) {
-    // Check if the user is authenticated and has admin privileges
-    if (req.isAuthenticated() && req.user.role === 'admin') {
-        return next();
-    }
-
-    // Render login page with an alert message
-    req.flash('error', 'Access restricted to admins only. Please log in as an admin.');
-    res.redirect('/admin/login');
-}
-
-
-
-// Helper function to fetch all participants for a race
-async function getAllParticipants(raceName) {
-    const participantsRef = db.collection('Races').doc(raceName).collection('Participants');
-    const snapshot = await participantsRef.get();
-    return snapshot.docs.reduce((acc, doc) => {
-        const data = doc.data();
-        acc[data.tagNumber] = {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            age: data.age,
-            gender: data.gender,
-        };
-        return acc;
-    }, {});
-}
-
-// Helper function to fetch reader data for a specific race
-async function getReaderData(raceName, readerIp) {
-    const readerRef = db.collection('RFIDReaders').doc(raceName).collection(readerIp);
-    const snapshot = await readerRef.get();
-
-    const readerData = {};
-    snapshot.docs.forEach(doc => {
-        const normalizedId = doc.id.trim().replace(/\s+/g, ''); // Normalize tag ID
-        readerData[normalizedId] = doc.data();
-    });
-
-    console.log(`Fetched tags for ${readerIp}:`, Object.keys(readerData)); // Debugging log
-    return readerData;
-}
-
 app.use((req, res, next) => {
     res.locals.success_msg = req.flash('success_msg');
     res.locals.error_msg = req.flash('error_msg');
@@ -126,6 +82,66 @@ passport.deserializeUser(async (username, done) => {
     }
 });
 
+//---------------------------------------------------------------------------------
+// ***********************    Functions and Middleware    *************************
+//---------------------------------------------------------------------------------
+
+function isAdmin(req, res, next) {
+    // Check if the user is authenticated and has admin privileges
+    if (req.isAuthenticated() && req.user.role === 'admin') {
+        return next();
+    }
+
+    // Render login page with an alert message
+    req.flash('error', 'Access restricted to admins only. Please log in as an admin.');
+    res.redirect('/admin/login');
+}
+
+// Ensure user is authenticated before allowing access to the participant form
+function isAuthenticated(req, res, next) {
+    if (req.isAuthenticated()) {
+        return next();
+    } else {
+        res.redirect('/login');
+    }
+}
+
+
+// Helper function to fetch all participants for a race
+async function getAllParticipants(raceName) {
+    const participantsRef = db.collection('Races').doc(raceName).collection('Participants');
+    const snapshot = await participantsRef.get();
+    return snapshot.docs.reduce((acc, doc) => {
+        const data = doc.data();
+        acc[data.tagNumber] = {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            age: data.age,
+            gender: data.gender,
+        };
+        return acc;
+    }, {});
+}
+
+// Helper function to fetch reader data for a specific race
+async function getReaderData(raceName, readerIp) {
+    const readerRef = db.collection('RFIDReaders').doc(raceName).collection(readerIp);
+    const snapshot = await readerRef.get();
+
+    const readerData = {};
+    snapshot.docs.forEach(doc => {
+        const normalizedId = doc.id.trim().replace(/\s+/g, ''); // Normalize tag ID
+        readerData[normalizedId] = doc.data();
+    });
+
+    console.log(`Fetched tags for ${readerIp}:`, Object.keys(readerData)); // Debugging log
+    return readerData;
+}
+
+//---------------------------------------------------------------------------------
+// *****************************    GET Routes    *********************************
+//---------------------------------------------------------------------------------
+
 // Route to display the registration form with available races
 app.get('/register', async (req, res) => {
     try {
@@ -138,51 +154,9 @@ app.get('/register', async (req, res) => {
     }
 });
 
-// Handle registration form submission
-app.post('/register', async (req, res) => {
-    const { firstName, lastName, phone, username, password, race } = req.body;
-
-    try {
-        const userRef = db.collection('Users').doc(username);
-        const userDoc = await userRef.get();
-
-        if (userDoc.exists) {
-            return res.status(400).send('User already exists');
-        }
-
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create the user document in Firestore
-        await userRef.set({
-            firstName,
-            lastName,
-            phone,
-            username,
-            password: hashedPassword,
-            race,
-            role: 'user', // Assign default role as user
-            status: 'pending', // Default status is pending
-        });
-
-        res.redirect('/login');
-    } catch (error) {
-        console.error('Error registering user:', error);
-        res.status(500).send('Failed to create user');
-    }
-});
-
 // Login page route
 app.get('/login', (req, res) => {
     res.render('login');
-});
-
-app.post('/login', (req, res, next) => {
-    passport.authenticate('local', {
-        successRedirect: '/participant-form', // Redirect to welcome page if login is successful
-        failureRedirect: '/login',
-        failureFlash: true  // Enable flash messages on failure
-    })(req, res, next);
 });
 
 // Route for the welcome screen (publicly accessible)
@@ -205,19 +179,35 @@ app.get('/welcome', async (req, res) => {
     }
 });
 
+// Dashboard route
+app.get('/dashboard', (req, res) => {
+    if (!req.isAuthenticated()) {
+        return res.redirect('/login');
+    }
+    res.render('dashboard'); // Add more data if required
+});
+
+// Participant form route (protected)
+app.get('/participant-form', isAuthenticated, (req, res) => {
+    const username = req.user.username;
+    const userRef = db.collection('Users').doc(username);
+    userRef.get().then((userDoc) => {
+        if (userDoc.exists && userDoc.data().status === 'approved') {
+            const race = userDoc.data().race;
+            res.render('participant-form', { race,username });
+        } else {
+            req.flash('error_msg', 'You must be approved by an admin before adding participants.');
+            res.redirect('/welcome');
+        }
+    });
+});
+
 
 app.get('/admin/login', (req, res) => {
     res.render('admin-login', {
         message: req.flash('error') || 'This page is only for admins.', // Default message
     });
 });
-
-
-app.post('/admin/login', passport.authenticate('local', {
-    successRedirect: '/admin/approve', // Redirect to admin approval page
-    failureRedirect: '/admin/login',  // Redirect back to login on failure
-    failureFlash: true                // Flash messages for errors
-}));
 
 
 app.get('/admin/approve', isAdmin, async (req, res) => {
@@ -238,111 +228,7 @@ app.get('/admin/approve', isAdmin, async (req, res) => {
     }
 });
 
-
-app.post('/admin/approve/:username', isAdmin, async (req, res) => {
-    const { username } = req.params;
-
-    try {
-        const userRef = db.collection('Users').doc(username);
-        const userDoc = await userRef.get();
-
-        if (!userDoc.exists) {
-            return res.status(404).send('User not found');
-        }
-
-        // Update user status to 'approved'
-        await userRef.update({
-            status: 'approved',
-        });
-
-        res.redirect('/admin/approve');
-    } catch (error) {
-        console.error('Error updating user status:', error);
-        res.status(500).send('Failed to approve user');
-    }
-});
-
-app.post('/admin/revoke/:username', isAdmin, async (req, res) => {
-    const { username } = req.params;
-
-    try {
-        const userRef = db.collection('Users').doc(username);
-        const userDoc = await userRef.get();
-
-        if (!userDoc.exists) {
-            return res.status(404).send('User not found');
-        }
-
-        // Update user status back to 'pending'
-        await userRef.update({
-            status: 'pending',
-        });
-
-        res.redirect('/admin/approve');
-    } catch (error) {
-        console.error('Error revoking user access:', error);
-        res.status(500).send('Failed to revoke user access.');
-    }
-});
-
-
-
-// Ensure user is authenticated before allowing access to the participant form
-function isAuthenticated(req, res, next) {
-    if (req.isAuthenticated()) {
-        return next();
-    } else {
-        res.redirect('/login');
-    }
-}
-
-// Participant form route (protected)
-app.get('/participant-form', isAuthenticated, (req, res) => {
-    const username = req.user.username;
-    const userRef = db.collection('Users').doc(username);
-    userRef.get().then((userDoc) => {
-        if (userDoc.exists && userDoc.data().status === 'approved') {
-            const race = userDoc.data().race;
-            res.render('participant-form', { race,username });
-        } else {
-            req.flash('error_msg', 'You must be approved by an admin before adding participants.');
-            res.redirect('/welcome');
-        }
-    });
-});
-
-// Use the isAuthenticated middleware for the route
-app.post('/submit-participant', isAuthenticated, async (req, res) => {
-    const { raceName, firstName, lastName, age, gender, tagNumber } = req.body;
-    const username = req.user.username; // Assuming the username is stored in req.user (from Passport.js)
-
-    if (!raceName || !tagNumber) {
-        return res.status(400).json({ success: false, message: 'Race name and tag number are required.' });
-    }
-
-    try {
-        // Store participant data under the race name and tag number
-        await db
-            .collection('Races')
-            .doc(raceName)
-            .collection('Participants')
-            .doc(tagNumber)
-            .set({
-                firstName,
-                lastName,
-                age: parseInt(age),
-                gender,
-                tagNumber,
-                username, // Save the username to associate with the logged-in user
-            });
-
-        res.json({ success: true, message: `Participant ${firstName} ${lastName} added successfully.` });
-    } catch (error) {
-        console.error('Error saving participant data:', error);
-        res.status(500).json({ success: false, message: 'Failed to submit participant information.' });
-    }
-});
-// Race results route
+// Sorted Race results route
 app.get('/sorted-race-results', async (req, res) => {
     const raceName = req.query.race; // Get race name from the query parameter
 
@@ -406,9 +292,24 @@ app.get('/sorted-race-results', async (req, res) => {
             }
         });
 
-        // Sort results within each category by time
+        // Sort results within each category by time and calculate rank and gap
         Object.keys(categories).forEach((category) => {
-            categories[category].sort((a, b) => a.time - b.time);
+            const results = categories[category];
+
+            results.sort((a, b) => a.time - b.time);
+
+            if (results.length > 0) {
+                const fastestTime = results[0].time; // Fastest time in the category
+
+                results.forEach((result, index) => {
+                    result.rank = index + 1;
+                    result.timeDifference = index === 0
+                        ? 'Leader'
+                        : `+${Math.floor((result.time - fastestTime) / 60000)}:${(((result.time - fastestTime) % 60000) / 1000)
+                            .toFixed(0)
+                            .padStart(2, '0')}`;
+                });
+            }
         });
 
         // Add category metadata
@@ -431,7 +332,7 @@ app.get('/sorted-race-results', async (req, res) => {
 });
 
 
-// Race results route
+// Race results overview
 app.get('/race-results', async (req, res) => {
     const raceName = req.query.race; // Get race name from the query parameter
 
@@ -521,6 +422,252 @@ app.get('/logout', (req, res) => {
         res.redirect('/login');
     });
 });
+
+
+// TESTING NEW EDITING
+
+app.get('/update-results', isAuthenticated, async (req, res) => {
+    const raceName = 'Californian Marathon'; // Get race name from the query parameter
+
+    if (!raceName) {
+        return res.status(400).send('Race name is required.');
+    }
+
+    try {
+        // Fetch all data in parallel
+        const [reader1Data, reader2Data, participants] = await Promise.all([
+            getReaderData(raceName, '192.168.10.1'),
+            getReaderData(raceName, '192.168.10.2'),
+            getAllParticipants(raceName),
+        ]);
+
+        const raceResults = Object.keys(reader1Data).reduce((results, tagId) => {
+            const normalizedTagId = tagId.trim().replace(/\s+/g, ''); // Normalize tag ID
+
+            if (!reader2Data[normalizedTagId]) {
+                console.log(`Tag ${tagId} not found in Reader 2.`);
+                return results;
+            }
+
+            const reader1 = reader1Data[tagId];
+            const reader2 = reader2Data[normalizedTagId];
+
+            const reader1DateTime = new Date(`${reader1.date}T${reader1.time}`);
+            const reader2DateTime = new Date(`${reader2.date}T${reader2.time}`);
+            const timeDifferenceMs = Math.abs(reader2DateTime - reader1DateTime);
+
+            const participant = participants[normalizedTagId];
+            const participantName = participant
+                ? `${participant.firstName} ${participant.lastName}`
+                : `Participant with tag ${tagId}`;
+
+            results.push({
+                tagId: normalizedTagId,
+                participantName,
+                start: reader1.time,
+                finish: reader2.time,
+                timeTaken: timeDifferenceMs,
+            });
+
+            return results;
+        }, []);
+
+        // Sort results by time taken
+        raceResults.sort((a, b) => a.timeTaken - b.timeTaken);
+
+        if (raceResults.length === 0) {
+            return res.render('update-results', { raceResults: [], raceName, message: 'No race results available for editing.' });
+        }
+
+        // Assign rank and calculate time differences
+        const fastestTime = raceResults[0].timeTaken; // Time taken by the leader
+        raceResults.forEach((result, index) => {
+            result.rank = index + 1;
+            result.timeTakenFormatted = new Date(result.timeTaken).toISOString().substr(11, 8); // Format HH:MM:SS
+            result.timeDifference = index === 0
+                ? 'Leader'
+                : `+${Math.floor((result.timeTaken - fastestTime) / 60000)}:${(((result.timeTaken - fastestTime) % 60000) / 1000).toFixed(0).padStart(2, '0')}`;
+        });
+
+        // Render update-results view
+        res.render('update-results', { raceResults, raceName, message: null });
+    } catch (error) {
+        console.error('Error fetching or processing data:', error);
+        res.status(500).send('Internal Server Error');
+    }
+});
+
+
+//---------------------------------------------------------------------------------
+// ****************************    POST Routes    ********************************
+//---------------------------------------------------------------------------------
+
+// User Logins
+app.post('/login', (req, res, next) => {
+    passport.authenticate('local', {
+        successRedirect: '/dashboard', // Redirect to welcome page if login is successful
+        failureRedirect: '/login',
+        failureFlash: true  // Enable flash messages on failure
+    })(req, res, next);
+});
+
+// Admin Logins
+app.post('/admin/login', passport.authenticate('local', {
+    successRedirect: '/admin/approve', // Redirect to admin approval page
+    failureRedirect: '/admin/login',  // Redirect back to login on failure
+    failureFlash: true                // Flash messages for errors
+}));
+
+// Handle registration form submission
+app.post('/register', async (req, res) => {
+    const { firstName, lastName, phone, username, password, race } = req.body;
+
+    try {
+        const userRef = db.collection('Users').doc(username);
+        const userDoc = await userRef.get();
+
+        if (userDoc.exists) {
+            return res.status(400).send('User already exists');
+        }
+
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create the user document in Firestore
+        await userRef.set({
+            firstName,
+            lastName,
+            phone,
+            username,
+            password: hashedPassword,
+            race,
+            role: 'user', // Assign default role as user
+            status: 'pending', // Default status is pending
+        });
+
+        res.redirect('/login');
+    } catch (error) {
+        console.error('Error registering user:', error);
+        res.status(500).send('Failed to create user');
+    }
+});
+
+// User Approval from Admin
+app.post('/admin/approve/:username', isAdmin, async (req, res) => {
+    const { username } = req.params;
+
+    try {
+        const userRef = db.collection('Users').doc(username);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            return res.status(404).send('User not found');
+        }
+
+        // Update user status to 'approved'
+        await userRef.update({
+            status: 'approved',
+        });
+
+        res.redirect('/admin/approve');
+    } catch (error) {
+        console.error('Error updating user status:', error);
+        res.status(500).send('Failed to approve user');
+    }
+});
+
+// To Revoke User Access from Admin
+app.post('/admin/revoke/:username', isAdmin, async (req, res) => {
+    const { username } = req.params;
+
+    try {
+        const userRef = db.collection('Users').doc(username);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            return res.status(404).send('User not found');
+        }
+
+        // Update user status back to 'pending'
+        await userRef.update({
+            status: 'pending',
+        });
+
+        res.redirect('/admin/approve');
+    } catch (error) {
+        console.error('Error revoking user access:', error);
+        res.status(500).send('Failed to revoke user access.');
+    }
+});
+
+// Use the isAuthenticated middleware for the route
+app.post('/submit-participant', isAuthenticated, async (req, res) => {
+    const { raceName, firstName, lastName, age, gender, tagNumber } = req.body;
+    const username = req.user.username; // Assuming the username is stored in req.user (from Passport.js)
+
+    if (!raceName || !tagNumber) {
+        return res.status(400).json({ success: false, message: 'Race name and tag number are required.' });
+    }
+
+    try {
+        // Store participant data under the race name and tag number
+        await db
+            .collection('Races')
+            .doc(raceName)
+            .collection('Participants')
+            .doc(tagNumber)
+            .set({
+                firstName,
+                lastName,
+                age: parseInt(age),
+                gender,
+                tagNumber,
+                username, // Save the username to associate with the logged-in user
+            });
+
+        res.json({ success: true, message: `Participant ${firstName} ${lastName} added successfully.` });
+    } catch (error) {
+        console.error('Error saving participant data:', error);
+        res.status(500).json({ success: false, message: 'Failed to submit participant information.' });
+    }
+});
+
+app.post('/update-timings', isAuthenticated, async (req, res) => {
+    const {
+        participantId, // Example: "0100"
+        startHours, startMinutes, startSeconds,
+        endHours, endMinutes, endSeconds,
+    } = req.body;
+
+    const raceName = req.query.race; // Example: "Californian Marathon"
+    const reader1 = '192.168.10.1'; // Reader 1
+    const reader2 = '192.168.10.2'; // Reader 2
+
+    try {
+        // Construct start and end times in HH:MM:SS format
+        const startTime = `${startHours.padStart(2, '0')}:${startMinutes.padStart(2, '0')}:${startSeconds.padStart(2, '0')}`;
+        const endTime = `${endHours.padStart(2, '0')}:${endMinutes.padStart(2, '0')}:${endSeconds.padStart(2, '0')}`;
+
+        // Firestore paths
+        const reader1Path = `RFIDReaders/${raceName}/${reader1}/${participantId}`;
+        const reader2Path = `RFIDReaders/${raceName}/${reader2}/${participantId}`;
+
+        // Update the start time in Reader 1 and end time in Reader 2
+        await Promise.all([
+            db.doc(reader1Path).update({ time: startTime }),
+            db.doc(reader2Path).update({ time: endTime }),
+        ]);
+
+        req.flash('success_msg', 'Timings updated successfully!');
+        res.redirect(`/update-results?race=${raceName}`);
+    } catch (error) {
+        console.error('Error updating timings:', error);
+        req.flash('error_msg', 'Failed to update timings.');
+        res.redirect(`/update-results?race=${raceName}`);
+    }
+});
+
+
 
 // Server start
 const PORT = process.env.PORT || 3000;
