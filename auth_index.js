@@ -196,6 +196,7 @@ app.get('/dashboard', async (req, res) => {
         }
 
         const userData = userDoc.data();
+        const firstName = userData.firstName; 
         const userRaces = userData.races || []; // Races the user is associated with
 
         // Fetch all races from RFIDReaders collection
@@ -216,8 +217,7 @@ app.get('/dashboard', async (req, res) => {
         res.render('dashboard', { 
             races: approvedRaces, 
             allRaces: availableRaces,
-            success_msg: req.flash('success_msg'), 
-            error_msg: req.flash('error_msg') 
+            firstName
         });
     } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -827,7 +827,7 @@ app.post('/request-access', isAuthenticated, async (req, res) => {
 
         await userRef.update({ races });
         
-        req.flash('success_msg', `Request for access to "${raceName}" has been submitted.`);
+        req.flash('success_msg', `Request for access to ${raceName} has been submitted.`);
         //console.log(req.flash());
         res.redirect('/dashboard');
     } catch (error) {

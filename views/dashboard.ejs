@@ -28,26 +28,28 @@
 <body>
     <%- include('partials/_headerAuth') %>
 
-        <!-- Flash Messages -->
-        <div class="container mt-3">
-            <% if (success_msg && success_msg.length > 0) { %>
-                <div class="alert alert-success alert-dismissible fade show" role="alert">
-                    <%= success_msg %>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            <% } %>
-            <% if (error && error.length > 0) { %>
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <%= error_msg %>
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            <% } %>
-        </div>
-
     <div class="container pt-5 my-5">
         <h1 class="text-center mb-4">Dashboard</h1>
+        <h5 class="text-center">Hello, <%= firstName %>!</h5>
         <p class="text-center">Select a race to manage its participants, results, and settings.</p>
-
+        <div class="container mt-3">
+            <% if (success_msg && success_msg.length > 0) { %>
+                <% success_msg.forEach(msg => { %>
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <%= msg %>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <% }) %>
+            <% } %>
+            <% if (error_msg && error_msg.length > 0) { %>
+                <% error_msg.forEach(msg => { %>
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <%= msg %>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <% }) %>
+            <% } %>            
+        </div>
         <!-- Dropdown to select race -->
         <div class="text-center mb-4">
             <select id="raceSelector" class="form-select w-50 mx-auto" onchange="onRaceChange()">
