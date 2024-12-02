@@ -180,28 +180,85 @@ app.get('/welcome', async (req, res) => {
 });
 
 // Dashboard route
-app.get('/dashboard', (req, res) => {
+app.get('/dashboard', async (req, res) => {
     if (!req.isAuthenticated()) {
         return res.redirect('/login');
     }
-    res.render('dashboard'); // Add more data if required
+
+    try {
+        const username = req.user.username;
+        const userRef = db.collection('Users').doc(username);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            req.flash('error_msg', 'User not found.');
+            return res.redirect('/login');
+        }
+
+        const userData = userDoc.data();
+        const userRaces = userData.races || []; // Races the user is associated with
+
+        // Fetch all races from RFIDReaders collection
+        const racesSnapshot = await db.collection('RFIDReaders').get();
+        const allRaces = racesSnapshot.docs.map(doc => ({
+            raceName: doc.id,
+        }));
+
+        // Filter out races the user already has access to
+        const availableRaces = allRaces.filter(race => 
+            !userRaces.some(userRace => userRace.raceName === race.raceName)
+        );
+
+        // Filter for approved races
+        const approvedRaces = userRaces.filter(race => race.status === 'approved');
+
+        // Render the dashboard view, passing flash messages
+        res.render('dashboard', { 
+            races: approvedRaces, 
+            allRaces: availableRaces,
+            success_msg: req.flash('success_msg'), 
+            error_msg: req.flash('error_msg') 
+        });
+    } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        req.flash('error_msg', 'Failed to load dashboard.');
+        res.redirect('/login');
+    }
 });
+
 
 // Participant form route (protected)
-app.get('/participant-form', isAuthenticated, (req, res) => {
+app.get('/participant-form', isAuthenticated, async (req, res) => {
     const username = req.user.username;
-    const userRef = db.collection('Users').doc(username);
-    userRef.get().then((userDoc) => {
-        if (userDoc.exists && userDoc.data().status === 'approved') {
-            const race = userDoc.data().race;
-            res.render('participant-form', { race,username });
-        } else {
-            req.flash('error_msg', 'You must be approved by an admin before adding participants.');
-            res.redirect('/welcome');
-        }
-    });
-});
+    const selectedRace = req.query.race; // Retrieve the race from the query parameter
 
+    try {
+        const userRef = db.collection('Users').doc(username);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists || userDoc.data().status !== 'approved') {
+            req.flash('error_msg', 'You must be approved by an admin before adding participants.');
+            return res.redirect('/welcome');
+        }
+
+        const races = userDoc.data().races || []; // Get the races array
+
+        // Ensure the selected race is part of the user's approved races
+        const approvedRaces = races.filter(race => race.status === 'approved');
+        const isRaceAuthorized = approvedRaces.some(race => race.raceName === selectedRace);
+
+        if (!selectedRace || !isRaceAuthorized) {
+            req.flash('error_msg', 'Invalid or unauthorized race selection.');
+            return res.redirect('/dashboard');
+        }
+
+        res.render('participant-form', { race: selectedRace, username });
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+        req.flash('error_msg', 'Failed to load participant form.');
+        res.redirect('/dashboard');
+    }
+});
 
 app.get('/admin/login', (req, res) => {
     res.render('admin-login', {
@@ -209,16 +266,23 @@ app.get('/admin/login', (req, res) => {
     });
 });
 
-
 app.get('/admin/approve', isAdmin, async (req, res) => {
     try {
         // Fetch pending users
         const pendingSnapshot = await db.collection('Users').where('status', '==', 'pending').get();
-        const pendingUsers = pendingSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const pendingUsers = pendingSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            races: doc.data().races || [] // Default to empty array if undefined
+        }));
 
         // Fetch approved users
         const approvedSnapshot = await db.collection('Users').where('status', '==', 'approved').get();
-        const approvedUsers = approvedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const approvedUsers = approvedSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+            races: doc.data().races || [] // Default to empty array if undefined
+        }));
 
         // Render the page with both pending and approved users
         res.render('admin-approve', { pendingUsers, approvedUsers });
@@ -227,6 +291,7 @@ app.get('/admin/approve', isAdmin, async (req, res) => {
         res.status(500).send('Failed to fetch users.');
     }
 });
+
 
 // Sorted Race results route
 app.get('/sorted-race-results', async (req, res) => {
@@ -427,7 +492,7 @@ app.get('/logout', (req, res) => {
 // TESTING NEW EDITING
 
 app.get('/update-results', isAuthenticated, async (req, res) => {
-    const raceName = 'Californian Marathon'; // Get race name from the query parameter
+    const raceName = req.query.race; // Get race name from the query parameter
 
     if (!raceName) {
         return res.status(400).send('Race name is required.');
@@ -533,6 +598,11 @@ app.post('/register', async (req, res) => {
         // Hash the password
         const hashedPassword = await bcrypt.hash(password, 10);
 
+        // Convert race to an array of objects with a pending status
+        const races = Array.isArray(race)
+            ? race.map(r => ({ raceName: r, status: 'pending' }))
+            : [{ raceName: race, status: 'pending' }];
+
         // Create the user document in Firestore
         await userRef.set({
             firstName,
@@ -540,7 +610,7 @@ app.post('/register', async (req, res) => {
             phone,
             username,
             password: hashedPassword,
-            race,
+            races, // Save races as objects with status
             role: 'user', // Assign default role as user
             status: 'pending', // Default status is pending
         });
@@ -551,6 +621,7 @@ app.post('/register', async (req, res) => {
         res.status(500).send('Failed to create user');
     }
 });
+
 
 // User Approval from Admin
 app.post('/admin/approve/:username', isAdmin, async (req, res) => {
@@ -667,6 +738,104 @@ app.post('/update-timings', isAuthenticated, async (req, res) => {
     }
 });
 
+// Approve a specific race for a user
+app.post('/admin/approve-race/:username', isAdmin, async (req, res) => {
+    const { username } = req.params;
+    const { raceName } = req.body;
+
+    try {
+        const userRef = db.collection('Users').doc(username);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            return res.status(404).send('User not found');
+        }
+
+        const updatedRaces = userDoc.data().races.map(race =>
+            race.raceName === raceName ? { ...race, status: 'approved' } : race
+        );
+
+        await userRef.update({ races: updatedRaces });
+        res.redirect('/admin/approve');
+    } catch (error) {
+        console.error('Error approving race:', error);
+        res.status(500).send('Failed to approve race.');
+    }
+});
+
+// Revoke a specific race for a user
+app.post('/admin/revoke-race/:username', isAdmin, async (req, res) => {
+    const { username } = req.params;
+    const { raceName } = req.body;
+
+    try {
+        const userRef = db.collection('Users').doc(username);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            return res.status(404).send('User not found');
+        }
+
+        const updatedRaces = userDoc.data().races.map(race =>
+            race.raceName === raceName ? { ...race, status: 'pending' } : race
+        );
+
+        await userRef.update({ races: updatedRaces });
+        res.redirect('/admin/approve');
+    } catch (error) {
+        console.error('Error revoking race:', error);
+        res.status(500).send('Failed to revoke race.');
+    }
+});
+
+app.post('/request-access', isAuthenticated, async (req, res) => {
+    const { raceName } = req.body;
+    const username = req.user.username;
+
+    try {
+        if (!raceName) {
+            req.flash('error_msg', 'Race name is required.');
+            return res.redirect('/dashboard');
+        }
+
+        const userRef = db.collection('Users').doc(username);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            req.flash('error_msg', 'User not found.');
+            return res.redirect('/dashboard');
+        }
+
+        const userData = userDoc.data();
+        const races = userData.races || [];
+
+        // Check if the race is already requested or approved
+        const alreadyRequested = races.some(
+            (race) => race.raceName === raceName
+        );
+
+        if (alreadyRequested) {
+            req.flash('error_msg', 'You have already requested or have access to this race.');
+            return res.redirect('/dashboard');
+        }
+
+        // Add the requested race to the user's races array with a pending status
+        races.push({
+            raceName,
+            status: 'pending',
+        });
+
+        await userRef.update({ races });
+        
+        req.flash('success_msg', `Request for access to "${raceName}" has been submitted.`);
+        //console.log(req.flash());
+        res.redirect('/dashboard');
+    } catch (error) {
+        console.error('Error handling access request:', error);
+        req.flash('error_msg', 'Failed to submit access request. Please try again later.');
+        res.redirect('/dashboard');
+    }
+});
 
 
 // Server start
