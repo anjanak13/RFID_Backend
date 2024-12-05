@@ -12,10 +12,10 @@
     <div class="container pt-5 my-5">
         <h1 class="mb-4">Admin Login</h1>
 
-        <!-- Display the alert message if it exists -->
-        <% if (message.length > 0) { %>
+        <!-- Display the error message only if it exists -->
+        <% if (error && error.length > 0) { %>
             <div class="alert alert-danger">
-                <%= message %>
+                <%= error %>
             </div>
         <% } %>
 

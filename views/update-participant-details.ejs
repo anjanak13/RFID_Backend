@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Update Participant Details - <%= raceName %></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <%- include('partials/_headerAuth') %>
+
+    <div class="container pt-5 my-5">
+        <h1 class="mb-4">Update Participant Details for <%= raceName %></h1>
+
+        <!-- Flash Messages -->
+        
+            <% if (success_msg && success_msg.length > 0) { %>
+                <% success_msg.forEach(msg => { %>
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <%= msg %>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <% }) %>
+            <% } %>
+            <% if (error_msg && error_msg.length > 0) { %>
+                <% error_msg.forEach(msg => { %>
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <%= msg %>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                <% }) %>
+            <% } %>            
+        
+
+        <% if (participants.length === 0) { %>
+            <div class="alert alert-warning">No participants found for this race.</div>
+        <% } else { %>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Tag Number</th>
+                        <th>First Name</th>
+                        <th>Last Name</th>
+                        <th>Age</th>
+                        <th>Gender</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <% participants.forEach(participant => { %>
+                        <tr>
+                            <td><%= participant.tagNumber %></td>
+                            <td><%= participant.firstName %></td>
+                            <td><%= participant.lastName %></td>
+                            <td><%= participant.age %></td>
+                            <td><%= participant.gender %></td>
+                            <td>
+                                <!-- Edit Participant Button -->
+                                <button 
+                                    class="btn btn-warning btn-sm edit-participant-btn" 
+                                    data-id="<%= participant.tagNumber %>" 
+                                    data-firstname="<%= participant.firstName %>" 
+                                    data-lastname="<%= participant.lastName %>" 
+                                    data-age="<%= participant.age %>" 
+                                    data-gender="<%= participant.gender %>">
+                                    Edit
+                                </button>
+                            </td>
+                        </tr>
+                    <% }); %>
+                </tbody>
+            </table>
+        <% } %>
+    </div>
+
+    <!-- Edit Participant Modal -->
+    <div class="modal fade" id="editParticipantModal" tabindex="-1" aria-labelledby="editParticipantModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="editParticipantForm" action="/update-participant-details" method="POST">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editParticipantModalLabel">Edit Participant</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" name="raceName" value="<%= raceName %>">
+                        <input type="hidden" name="participantId" id="participantId">
+                
+                        <!-- New Tag Number -->
+                        <div class="mb-3">
+                            <label for="newTagNumber" class="form-label">Tag Number</label>
+                            <input type="text" class="form-control" id="newTagNumber" name="newTagNumber" required>
+                        </div>
+                
+                        <!-- Participant Details -->
+                        <div class="mb-3">
+                            <label for="firstName" class="form-label">First Name</label>
+                            <input type="text" class="form-control" id="firstName" name="firstName" required>
+                        </div>
+                
+                        <div class="mb-3">
+                            <label for="lastName" class="form-label">Last Name</label>
+                            <input type="text" class="form-control" id="lastName" name="lastName" required>
+                        </div>
+                
+                        <div class="mb-3">
+                            <label for="age" class="form-label">Age</label>
+                            <input type="number" class="form-control" id="age" name="age" required>
+                        </div>
+                
+                        <div class="mb-3">
+                            <label for="gender" class="form-label">Gender</label>
+                            <select class="form-select" id="gender" name="gender" required>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Update</button>
+                    </div>
+                </form>
+                
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <script>
+        document.querySelectorAll('.edit-participant-btn').forEach(button => {
+            button.addEventListener('click', () => {
+                const modal = new bootstrap.Modal(document.getElementById('editParticipantModal'));
+    
+                // Populate the modal fields with participant data
+                document.getElementById('participantId').value = button.dataset.id;
+                document.getElementById('newTagNumber').value = button.dataset.id; // Default to current tag number
+                document.getElementById('firstName').value = button.dataset.firstname;
+                document.getElementById('lastName').value = button.dataset.lastname;
+                document.getElementById('age').value = button.dataset.age;
+                document.getElementById('gender').value = button.dataset.gender;
+    
+                // Show the modal
+                modal.show();
+            });
+        });
+    </script>
+    
+</body>
+</html>

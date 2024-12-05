@@ -32,6 +32,7 @@ app.use(flash());
 app.use((req, res, next) => {
     res.locals.success_msg = req.flash('success_msg');
     res.locals.error_msg = req.flash('error_msg');
+    res.locals.warning_msg = req.flash('warning_msg');
     res.locals.error = req.flash('error');
     next();
 });
@@ -348,7 +349,11 @@ app.get('/sorted-race-results', async (req, res) => {
             const age = participant.age;
             const gender = participant.gender;
 
-            if (age >= 16 && age <= 39) {
+            // Categorize participants based on age and gender
+            if (gender === 'Other') {
+                // Participants with gender "Other" go into Uncategorized
+                categories['Uncategorized'].push(result);
+            } else if (age >= 16 && age <= 39) {
                 categories[gender === 'Male' ? 'Men (16-39)' : 'Women (16-39)'].push(result);
             } else if (age >= 40) {
                 categories[gender === 'Male' ? 'Men (40+)' : 'Women (40+)'].push(result);
@@ -406,68 +411,70 @@ app.get('/race-results', async (req, res) => {
     }
 
     try {
-        // Fetch all data in parallel to speed up the loading process (down form 10 seconds to 2/3)
+        // Fetch all data in parallel to speed up the loading process
         const [reader1Data, reader2Data, participants] = await Promise.all([
             getReaderData(raceName, '192.168.10.1'),
             getReaderData(raceName, '192.168.10.2'),
             getAllParticipants(raceName),
         ]);
 
-        const raceResults = Object.keys(reader1Data).reduce((results, tagId) => {
-            const normalizedTagId = tagId.trim().replace(/\s+/g, ''); // Normalize tag ID
-            
-            // Skip if the tag is not found in Reader 2 data
-            if (!reader2Data[normalizedTagId]) {
-                console.log(`Tag ${tagId} not found in Reader 2.`);
-                return results;
-            }
+        const raceResults = [];
+        const pendingResults = [];
 
+        Object.keys(reader1Data).forEach(tagId => {
+            const normalizedTagId = tagId.trim().replace(/\s+/g, ''); // Normalize tag ID
             const reader1 = reader1Data[tagId];
             const reader2 = reader2Data[normalizedTagId];
-
-            const reader1DateTime = new Date(`${reader1.date}T${reader1.time}`);
-            const reader2DateTime = new Date(`${reader2.date}T${reader2.time}`);
-            const timeDifferenceMs = Math.abs(reader2DateTime - reader1DateTime);
 
             const participant = participants[normalizedTagId];
             const participantName = participant
                 ? `${participant.firstName} ${participant.lastName}`
                 : `Participant with tag ${tagId}`;
-            
-            results.push({
-                participantName,
-                start: reader1.time,
-                finish: reader2.time,
-                timeTaken: timeDifferenceMs,
-            });
 
-            return results;
-        }, []);
+            if (!reader2) {
+                // Add to pending results if timing exists in reader1 but not reader2
+                pendingResults.push({
+                    participantName,
+                    start: reader1.time,
+                });
+            } else {
+                // Calculate race results if timing exists in both readers
+                const reader1DateTime = new Date(`${reader1.date}T${reader1.time}`);
+                const reader2DateTime = new Date(`${reader2.date}T${reader2.time}`);
+                const timeDifferenceMs = Math.abs(reader2DateTime - reader1DateTime);
 
-        // Sort results by time taken
-        raceResults.sort((a, b) => a.timeTaken - b.timeTaken);
-
-        if (raceResults.length === 0) {
-            return res.render('race-results', { raceResults: [], raceName, message: 'No race results available.' });
-        }
-
-        // Assign rank and calculate time differences
-        const fastestTime = raceResults[0].timeTaken; // Time taken by the leader
-        raceResults.forEach((result, index) => {
-            result.rank = index + 1;
-            result.timeTakenFormatted = new Date(result.timeTaken).toISOString().substr(11, 8); // Format HH:MM:SS
-            result.timeDifference = index === 0
-                ? 'Leader'
-                : `+${Math.floor((result.timeTaken - fastestTime) / 60000)}:${(((result.timeTaken - fastestTime) % 60000) / 1000).toFixed(0).padStart(2, '0')}`;
+                raceResults.push({
+                    participantName,
+                    start: reader1.time,
+                    finish: reader2.time,
+                    timeTaken: timeDifferenceMs,
+                });
+            }
         });
 
+        // Sort completed race results by time taken
+        raceResults.sort((a, b) => a.timeTaken - b.timeTaken);
+
+        // Assign rank and calculate time differences
+        if (raceResults.length > 0) {
+            const fastestTime = raceResults[0].timeTaken; // Time taken by the leader
+            raceResults.forEach((result, index) => {
+                result.rank = index + 1;
+                result.timeTakenFormatted = new Date(result.timeTaken).toISOString().substr(11, 8); // Format HH:MM:SS
+                result.timeDifference = index === 0
+                    ? 'Leader'
+                    : `+${Math.floor((result.timeTaken - fastestTime) / 60000)}:${(((result.timeTaken - fastestTime) % 60000) / 1000).toFixed(0).padStart(2, '0')}`;
+            });
+        }
+
         // Render results with race name
-        res.render('race-results', { raceResults, raceName });
+        res.render('race-results', { raceResults, pendingResults, raceName });
     } catch (error) {
         console.error('Error fetching or processing data:', error);
         res.status(500).send('Internal Server Error');
     }
 });
+
 
 app.get('/select-result-type', (req, res) => {
     const raceName = req.query.race;
@@ -562,6 +569,36 @@ app.get('/update-results', isAuthenticated, async (req, res) => {
     }
 });
 
+app.get('/update-participant-details', isAuthenticated, async (req, res) => {
+    const raceName = req.query.race; // Race name from query parameter
+
+    if (!raceName) {
+        req.flash('error_msg', 'Race name is required.');
+        return res.redirect('/dashboard');
+    }
+
+    try {
+        // Fetch participants for the specified race
+        const participantsRef = db.collection('Races').doc(raceName).collection('Participants');
+        const snapshot = await participantsRef.get();
+
+        // Map participants to an array
+        const participants = snapshot.docs.map(doc => ({
+            tagNumber: doc.id, // Tag number is the document ID
+            ...doc.data(), // Spread other participant fields
+        }));
+
+        // Render the page with participant data
+        res.render('update-participant-details', {
+            raceName,
+            participants
+        });
+    } catch (error) {
+        console.error('Error fetching participant data:', error);
+        req.flash('error_msg', 'Failed to load participant data.');
+        res.redirect('/dashboard');
+    }
+});
 
 //---------------------------------------------------------------------------------
 // ****************************    POST Routes    ********************************
@@ -640,6 +677,7 @@ app.post('/admin/approve/:username', isAdmin, async (req, res) => {
             status: 'approved',
         });
 
+        req.flash('success_msg', `Access Granted to user "${username}".`);
         res.redirect('/admin/approve');
     } catch (error) {
         console.error('Error updating user status:', error);
@@ -664,6 +702,7 @@ app.post('/admin/revoke/:username', isAdmin, async (req, res) => {
             status: 'pending',
         });
 
+        req.flash('warning_msg', `Access revoked from user "${username}".`);
         res.redirect('/admin/approve');
     } catch (error) {
         console.error('Error revoking user access:', error);
@@ -756,6 +795,8 @@ app.post('/admin/approve-race/:username', isAdmin, async (req, res) => {
         );
 
         await userRef.update({ races: updatedRaces });
+
+        req.flash('success_msg', `Access to race "${raceName}" granted to user "${username}".`);
         res.redirect('/admin/approve');
     } catch (error) {
         console.error('Error approving race:', error);
@@ -765,6 +806,7 @@ app.post('/admin/approve-race/:username', isAdmin, async (req, res) => {
 
 // Revoke a specific race for a user
 app.post('/admin/revoke-race/:username', isAdmin, async (req, res) => {
+    console.log('Revoke race route triggered');
     const { username } = req.params;
     const { raceName } = req.body;
 
@@ -781,6 +823,7 @@ app.post('/admin/revoke-race/:username', isAdmin, async (req, res) => {
         );
 
         await userRef.update({ races: updatedRaces });
+        req.flash('warning_msg', `Access to race "${raceName}" revoked from user "${username}".`);
         res.redirect('/admin/approve');
     } catch (error) {
         console.error('Error revoking race:', error);
@@ -836,6 +879,68 @@ app.post('/request-access', isAuthenticated, async (req, res) => {
         res.redirect('/dashboard');
     }
 });
+
+app.post('/update-participant-details', isAuthenticated, async (req, res) => {
+    const { raceName, participantId, newTagNumber, firstName, lastName, age, gender } = req.body;
+
+    // Validate required fields
+    if (!raceName || !participantId || !newTagNumber || !firstName || !lastName || !age || !gender) {
+        req.flash('error_msg', 'All fields are required.');
+        return res.redirect(`/update-participant-details?race=${raceName}`);
+    }
+
+    try {
+        const participantsRef = db.collection('Races').doc(raceName).collection('Participants');
+        const oldParticipantRef = participantsRef.doc(participantId); // Old document
+        const newParticipantRef = participantsRef.doc(newTagNumber); // New document
+
+        // Fetch the existing participant data
+        const participantDoc = await oldParticipantRef.get();
+        if (!participantDoc.exists) {
+            req.flash('error_msg', 'Participant not found.');
+            return res.redirect(`/update-participant-details?race=${raceName}`);
+        }
+
+        // Check if the new tag number already exists
+        const newTagDoc = await newParticipantRef.get();
+        if (newTagDoc.exists && participantId !== newTagNumber) {
+            req.flash('error_msg', `Update Unsuccessful, Tag number ${newTagNumber} is already in use.`);
+            return res.redirect(`/update-participant-details?race=${raceName}`);
+        }
+
+        // Merge existing data with the updated fields
+        const updatedParticipantData = {
+            ...participantDoc.data(), // Include existing data
+            firstName,
+            lastName,
+            age: parseInt(age, 10),
+            gender,
+            tagNumber: newTagNumber, // Update tag number explicitly
+        };
+
+        // Write the updated data to the new tag number document
+        await newParticipantRef.set(updatedParticipantData);
+
+        // Delete the old document if the tag number has changed
+        if (participantId !== newTagNumber) {
+            await oldParticipantRef.delete();
+        }
+
+        if (participantId == newTagNumber){
+            req.flash('success_msg', `Participant ${firstName} ${lastName}'s details successfully updated!`);
+            return res.redirect(`/update-participant-details?race=${raceName}`);
+        }
+        
+        req.flash('success_msg', `Participant ${firstName} ${lastName} successfully updated with new tag number ${newTagNumber}.`);
+        //console.log(req.flash());
+        res.redirect(`/update-participant-details?race=${raceName}`);
+    } catch (error) {
+        console.error('Error updating participant data:', error);
+        req.flash('error_msg', 'Failed to update participant data. Please try again.');
+        res.redirect(`/update-participant-details?race=${raceName}`);
+    }
+});
+
 
 
 // Server start

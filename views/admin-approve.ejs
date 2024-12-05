@@ -12,6 +12,31 @@
     <div class="container pt-5 my-5">
         <h1>Approve Users and Manage Races</h1>
 
+        <% if (success_msg && success_msg.length > 0) { %>
+            <% success_msg.forEach(msg => { %>
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <%= msg %>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% }) %>
+        <% } %>
+        <% if (error_msg && error_msg.length > 0) { %>
+            <% error_msg.forEach(msg => { %>
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <%= msg %>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% }) %>
+        <% } %>    
+        <% if (warning_msg && warning_msg.length > 0) { %>
+            <% warning_msg.forEach(msg => { %>
+                <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                    <%= msg %>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            <% }) %>
+        <% } %>   
+
         <!-- Pending Users -->
         <h2 class="mt-5">Pending Users</h2>
         <table class="table table-striped">

@@ -10,10 +10,10 @@
     <%- include('partials/_header') %>
 
     <div class="container pt-5 my-5">
-
         <h1 class="text-center mb-5">Race Results for <%= raceName %></h1>
-
+    
         <div class="row">
+            <h2>Completed Results</h2>
             <table class="table table-striped">
                 <thead>
                     <tr>
@@ -22,7 +22,7 @@
                         <th>Start Time</th>
                         <th>Finish Time</th>
                         <th>Time Taken (HH:MM:SS)</th>
-                        <th>Leader(MM:SS)</th>
+                        <th>Leader (MM:SS)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -39,8 +39,30 @@
                 </tbody>
             </table>
         </div>
-
+    
+        <% if (pendingResults && pendingResults.length > 0) { %>
+            <div class="row mt-5">
+                <h2>Pending Results</h2>
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Participant Name</th>
+                            <th>Start Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% pendingResults.forEach(result => { %>
+                            <tr>
+                                <td><%= result.participantName %></td>
+                                <td><%= result.start %></td>
+                            </tr>
+                        <% }); %>
+                    </tbody>
+                </table>
+            </div>
+        <% } %>
     </div>
+    
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
 </body>
