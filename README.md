@@ -61,7 +61,7 @@ This project is a Node.js application for managing RFID race data. It provides a
 
 4. **Run the Application**:
    ```bash
-   npm auth_index.js
+   node auth_index.js
    ```
    The application will be accessible at `http://localhost:3000`.
 
