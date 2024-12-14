@@ -1,4 +1,5 @@
 env
+.env
 Extra
 
 node_modules

@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -19,7 +20,7 @@ app.set('views', path.join(__dirname, 'views'));
 
 // Session setup
 app.use(session({
-    secret: 'KitKats-are-Amazing-Aj13', // Use a strong secret in production
+    secret: process.env.SECRET_KEY,
     resave: false,
     saveUninitialized: true,
 }));
