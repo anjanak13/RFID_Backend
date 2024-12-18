@@ -8,6 +8,7 @@ const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const flash = require('connect-flash');
+const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(cors());
@@ -36,6 +37,15 @@ app.use((req, res, next) => {
     res.locals.warning_msg = req.flash('warning_msg');
     res.locals.error = req.flash('error');
     next();
+});
+
+// Configure transporter with Gmail SMTP
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_PASS,
+    },
 });
 
 // Passport Local Strategy
@@ -178,6 +188,29 @@ app.get('/welcome', async (req, res) => {
     } catch (error) {
         console.error('Error fetching races:', error);
         res.status(500).send('Failed to fetch races.');
+    }
+});
+
+app.get('/admin/dashboard', isAdmin, async (req, res) => {
+    try {
+        const username = req.user.username;
+        const userRef = db.collection('Users').doc(username);
+        const userDoc = await userRef.get();
+
+        if (!userDoc.exists) {
+            req.flash('error_msg', 'User not found.');
+            return res.redirect('/login');
+        }
+
+        const userData = userDoc.data();
+        const firstName = userData.firstName; 
+
+        res.render('adminDashboard', { 
+            firstName
+        });
+
+    } catch (error) {
+        
     }
 });
 
@@ -616,11 +649,12 @@ app.post('/login', (req, res, next) => {
 
 // Admin Logins
 app.post('/admin/login', passport.authenticate('local', {
-    successRedirect: '/admin/approve', // Redirect to admin approval page
+    successRedirect: '/admin/dashboard', // Redirect to admin approval page
     failureRedirect: '/admin/login',  // Redirect back to login on failure
     failureFlash: true                // Flash messages for errors
 }));
 
+// Handle registration form submission
 // Handle registration form submission
 app.post('/register', async (req, res) => {
     const { firstName, lastName, phone, username, password, race } = req.body;
@@ -653,12 +687,25 @@ app.post('/register', async (req, res) => {
             status: 'pending', // Default status is pending
         });
 
+        // Send account creation email
+        const mailOptions = {
+            from: `"Race Approval Team" <${process.env.GMAIL_USER}>`, // Replace with your email
+            to: username, // User's email (assuming 'username' is the email)
+            subject: 'Account Created Successfully',
+            text: `Hello ${firstName},\n\nWelcome to our race management system! Your account has been successfully created. You will be able to access your account as soon as it gets approved by the administrator.\n\nBest regards,\nThe Race Approval Team`,
+
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`Account creation email sent to ${username}`);
+
         res.redirect('/login');
     } catch (error) {
-        console.error('Error registering user:', error);
+        console.error('Error registering user or sending email:', error);
         res.status(500).send('Failed to create user');
     }
 });
+
 
 
 // User Approval from Admin
@@ -678,13 +725,28 @@ app.post('/admin/approve/:username', isAdmin, async (req, res) => {
             status: 'approved',
         });
 
-        req.flash('success_msg', `Access Granted to user "${username}".`);
+        // Get the user's email from Firestore
+        const userData = userDoc.data();
+        const firstName = userData.firstName; 
+
+        // Send an approval email
+        const mailOptions = {
+            from: '"Race Approval Team" <${process.env.GMAIL_USER}>',
+            to: username, // User's email
+            subject: 'Race Approval Notification',
+            text: `Hello ${firstName},\n\nCongratulations! Your account has been successfully approved. You now have access to edit and manage race information.\n\nBest regards,\nRace Approval Team`,
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        req.flash('success_msg', `Access Granted to user "${firstName}". Email sent to ${username}.`);
         res.redirect('/admin/approve');
     } catch (error) {
-        console.error('Error updating user status:', error);
-        res.status(500).send('Failed to approve user');
+        console.error('Error approving user or sending email:', error);
+        res.status(500).send('Failed to approve user and send email');
     }
 });
+
 
 // To Revoke User Access from Admin
 app.post('/admin/revoke/:username', isAdmin, async (req, res) => {
