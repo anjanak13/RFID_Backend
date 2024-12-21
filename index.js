@@ -159,7 +159,7 @@ app.get('/register', async (req, res) => {
     try {
         const racesSnapshot = await db.collection('RFIDReaders').get();
         const races = racesSnapshot.docs.map(doc => doc.id); // Assuming the race name is the document ID
-        res.render('register', { races });
+        res.render('user/register', { races });
     } catch (error) {
         console.error('Error fetching races:', error);
         res.status(500).send('Failed to fetch available races.');
@@ -168,11 +168,11 @@ app.get('/register', async (req, res) => {
 
 // Login page route
 app.get('/login', (req, res) => {
-    res.render('login');
+    res.render('user/login');
 });
 
 // Route for the welcome screen (publicly accessible)
-app.get('/welcome', async (req, res) => {
+app.get('/', async (req, res) => {
     try {
         const racesSnapshot = await db.collection('RFIDReaders').get();
 
@@ -205,7 +205,7 @@ app.get('/admin/dashboard', isAdmin, async (req, res) => {
         const userData = userDoc.data();
         const firstName = userData.firstName; 
 
-        res.render('adminDashboard', { 
+        res.render('admin/adminDashboard', { 
             firstName
         });
 
@@ -249,7 +249,7 @@ app.get('/dashboard', async (req, res) => {
         const approvedRaces = userRaces.filter(race => race.status === 'approved');
 
         // Render the dashboard view, passing flash messages
-        res.render('dashboard', { 
+        res.render('user/dashboard', { 
             races: approvedRaces, 
             allRaces: availableRaces,
             firstName
@@ -287,7 +287,7 @@ app.get('/participant-form', isAuthenticated, async (req, res) => {
             return res.redirect('/dashboard');
         }
 
-        res.render('participant-form', { race: selectedRace, username });
+        res.render('user/participant-form', { race: selectedRace, username });
     } catch (error) {
         console.error('Error fetching user data:', error);
         req.flash('error_msg', 'Failed to load participant form.');
@@ -296,7 +296,7 @@ app.get('/participant-form', isAuthenticated, async (req, res) => {
 });
 
 app.get('/admin/login', (req, res) => {
-    res.render('admin-login', {
+    res.render('admin/admin-login', {
         message: req.flash('error') || 'This page is only for admins.', // Default message
     });
 });
@@ -320,7 +320,7 @@ app.get('/admin/approve', isAdmin, async (req, res) => {
         }));
 
         // Render the page with both pending and approved users
-        res.render('admin-approve', { pendingUsers, approvedUsers });
+        res.render('admin/admin-approve', { pendingUsers, approvedUsers });
     } catch (error) {
         console.error('Error fetching users:', error);
         res.status(500).send('Failed to fetch users.');
@@ -428,7 +428,7 @@ app.get('/sorted-race-results', async (req, res) => {
         }));
 
         // Render the results page with the race name
-        res.render('cat-results', { categoryStats, raceName });
+        res.render('public/cat-results', { categoryStats, raceName });
     } catch (error) {
         console.error('Error processing race results:', error);
         res.status(500).send('Internal Server Error');
@@ -502,7 +502,7 @@ app.get('/race-results', async (req, res) => {
         }
 
         // Render results with race name
-        res.render('race-results', { raceResults, pendingResults, raceName });
+        res.render('public/race-results', { raceResults, pendingResults, raceName });
     } catch (error) {
         console.error('Error fetching or processing data:', error);
         res.status(500).send('Internal Server Error');
@@ -517,7 +517,7 @@ app.get('/select-result-type', (req, res) => {
         return res.status(400).send('Race name is required.');
     }
 
-    res.render('select-race-type', { raceName });
+    res.render('public/select-race-type', { raceName });
 });
 
 app.get('/logout', (req, res) => {
@@ -596,7 +596,7 @@ app.get('/update-results', isAuthenticated, async (req, res) => {
         });
 
         // Render update-results view
-        res.render('update-results', { raceResults, raceName, message: null });
+        res.render('user/update-results', { raceResults, raceName, message: null });
     } catch (error) {
         console.error('Error fetching or processing data:', error);
         res.status(500).send('Internal Server Error');
@@ -623,7 +623,7 @@ app.get('/update-participant-details', isAuthenticated, async (req, res) => {
         }));
 
         // Render the page with participant data
-        res.render('update-participant-details', {
+        res.render('user/update-participant-details', {
             raceName,
             participants
         });
