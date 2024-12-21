@@ -9,6 +9,12 @@ const bcrypt = require('bcryptjs');
 const session = require('express-session');
 const flash = require('connect-flash');
 const nodemailer = require('nodemailer');
+const {
+    isAuthenticated,
+    isAdmin,
+    getAllParticipants,
+    getReaderData,
+} = require('./config/helpers');
 
 const app = express();
 app.use(cors());
@@ -93,62 +99,6 @@ passport.deserializeUser(async (username, done) => {
         done(err);
     }
 });
-
-//---------------------------------------------------------------------------------
-// ***********************    Functions and Middleware    *************************
-//---------------------------------------------------------------------------------
-
-function isAdmin(req, res, next) {
-    // Check if the user is authenticated and has admin privileges
-    if (req.isAuthenticated() && req.user.role === 'admin') {
-        return next();
-    }
-
-    // Render login page with an alert message
-    req.flash('error', 'Access restricted to admins only. Please log in as an admin.');
-    res.redirect('/admin/login');
-}
-
-// Ensure user is authenticated before allowing access to the participant form
-function isAuthenticated(req, res, next) {
-    if (req.isAuthenticated()) {
-        return next();
-    } else {
-        res.redirect('/login');
-    }
-}
-
-
-// Helper function to fetch all participants for a race
-async function getAllParticipants(raceName) {
-    const participantsRef = db.collection('Races').doc(raceName).collection('Participants');
-    const snapshot = await participantsRef.get();
-    return snapshot.docs.reduce((acc, doc) => {
-        const data = doc.data();
-        acc[data.tagNumber] = {
-            firstName: data.firstName,
-            lastName: data.lastName,
-            age: data.age,
-            gender: data.gender,
-        };
-        return acc;
-    }, {});
-}
-
-// Helper function to fetch reader data for a specific race
-async function getReaderData(raceName, readerIp) {
-    const readerRef = db.collection('RFIDReaders').doc(raceName).collection(readerIp);
-    const snapshot = await readerRef.get();
-
-    const readerData = {};
-    snapshot.docs.forEach(doc => {
-        const normalizedId = doc.id.trim().replace(/\s+/g, ''); // Normalize tag ID
-        readerData[normalizedId] = doc.data();
-    });
-
-    console.log(`Fetched tags for ${readerIp}:`, Object.keys(readerData)); // Debugging log
-    return readerData;
-}
 
 //---------------------------------------------------------------------------------
 // *****************************    GET Routes    *********************************
