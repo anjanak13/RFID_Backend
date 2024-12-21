@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { isAdmin, isAuthenticated, getReaderData, getAllParticipants } = require('../config/helpers'); // Update with correct imports
+const { isAdmin, isAuthenticated, getReaderData, getAllParticipants } = require('../config/helpers');
 const db = require('../firebaseConfig');
 
 //---------------------------------------------------------------------------------

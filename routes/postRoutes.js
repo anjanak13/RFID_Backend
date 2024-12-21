@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { isAdmin, isAuthenticated } = require('../config/helpers'); // Update with correct imports
+const { isAdmin, isAuthenticated } = require('../config/helpers');
 const db = require('../firebaseConfig');
 const passport = require('passport');
 const bcrypt = require('bcryptjs');
