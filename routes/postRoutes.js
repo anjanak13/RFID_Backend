@@ -68,17 +68,27 @@ router.post('/register', async (req, res) => {
             status: 'pending', // Default status is pending
         });
 
-        // Send account creation email
-        const mailOptions = {
+        // Send account creation email to the user
+        const userMailOptions = {
             from: `"Race Approval Team" <${process.env.GMAIL_USER}>`, // Replace with your email
             to: username, // User's email (assuming 'username' is the email)
             subject: 'Account Created Successfully',
             text: `Hello ${firstName},\n\nWelcome to our race management system! Your account has been successfully created. You will be able to access your account as soon as it gets approved by the administrator.\n\nBest regards,\nThe Race Approval Team`,
-
         };
 
-        await transporter.sendMail(mailOptions);
+        await transporter.sendMail(userMailOptions);
         console.log(`Account creation email sent to ${username}`);
+
+        // Send email notification to the admin
+        const adminMailOptions = {
+            from: `"Race Approval Team" <${process.env.GMAIL_USER}>`, // Replace with your email
+            to: process.env.ADMIN_EMAIL, // Admin's email address (set in environment variables)
+            subject: 'New Account Created',
+            text: `Hello Admin,\n\nA new user account has been created.\n\nDetails:\nName: ${firstName} ${lastName}\nEmail: ${username}\nPhone: ${phone}\n\nPlease review and approve the account as necessary.\n\nBest regards,\nThe Race Approval System`,
+        };
+
+        await transporter.sendMail(adminMailOptions);
+        console.log(`Admin notification email sent to ${process.env.ADMIN_EMAIL}`);
 
         res.redirect('/login');
     } catch (error) {
@@ -86,7 +96,6 @@ router.post('/register', async (req, res) => {
         res.status(500).send('Failed to create user');
     }
 });
-
 
 
 // User Approval from Admin
