@@ -1,5 +1,7 @@
 # Express RFID Dashboard ⏱🏁
 
+[![Build and deploy Node.js app to Azure Web App - Race](https://github.com/anjanak13/RFID_Backend/actions/workflows/main_race.yml/badge.svg)](https://github.com/anjanak13/RFID_Backend/actions/workflows/main_race.yml)
+
 ## Overview
 This project is a Node.js application for managing RFID race data. It provides a dashboard for race participants, race results, and admin approvals. Built with Express, EJS, and Firebase, the application supports user authentication, role-based access control, and race-specific data storage in Firebase Firestore. The dashboard includes features for participant registration, race results visualization, and race management.
 
